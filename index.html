@@ -400,8 +400,11 @@ tbody td.c{text-align:center;}tbody td.sp{border-left:2px solid var(--b2);}
   </div>
   <div class="hdr-chips" id="hdrChips"></div>
   <div class="hdr-r">
+    <span id="syncStatus" style="font-size:10px;color:var(--t3);align-self:center;white-space:nowrap"></span>
+    <button class="hbtn" onclick="loadFromSupabase()" title="Cargar datos de la nube"><i class="ti ti-cloud-download" style="font-size:12px"></i>Actualizar</button>
+    <button class="hbtn" style="background:var(--grn);color:#fff;border-color:var(--grn)" onclick="publishToSupabase()" title="Publicar datos para el equipo"><i class="ti ti-cloud-upload" style="font-size:12px"></i>Publicar</button>
     <button class="hbtn" onclick="exportSession()"><i class="ti ti-download" style="font-size:12px"></i>Guardar sesion</button>
-    <label class="hbtn" style="cursor:pointer;display:flex;align-items:center;gap:5px"><i class="ti ti-folder-open" style="font-size:12px"></i>Importar sesion<input type="file" accept=".json" onchange="importSession(event)" style="display:none"/></label>
+    <label class="hbtn" style="cursor:pointer;display:flex;align-items:center;gap:5px"><i class="ti ti-folder-open" style="font-size:12px"></i>Importar<input type="file" accept=".json" onchange="importSession(event)" style="display:none"/></label>
     <button class="hbtn" onclick="openPanel()"><i class="ti ti-upload" style="font-size:12px"></i>Cargar archivos</button>
     <button class="hbtn pri" onclick="showPage('cond')"><i class="ti ti-users" style="font-size:12px"></i>Conductores</button>
   </div>
@@ -1762,7 +1765,7 @@ function saveSession(){try{var slim={};for(var fecha in DIAS){var d=DIAS[fecha];
 function loadSession(){try{var saved=localStorage.getItem(SESSION_KEY);if(!saved)return;var data=JSON.parse(saved);for(var fecha in data)DIAS[fecha]=data[fecha];var fs=Object.keys(DIAS).sort();if(fs.length){curDay=fs[fs.length-1];renderTabs();render();updateHdrChips();showToast('Sesion restaurada: '+fs.length+' dia(s)');}}catch(e){}}
 function exportSession(){if(!Object.keys(DIAS).length){showToast('Sin datos');return;}var blob=new Blob([JSON.stringify(DIAS)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='flotaops_sesion_'+new Date().toISOString().slice(0,10)+'.json';a.click();showToast('Sesion exportada');}
 function importSession(evt){var f=evt.target.files[0];if(!f)return;var reader=new FileReader();reader.onload=function(e){try{var data=JSON.parse(e.target.result);for(var fecha in data)DIAS[fecha]=data[fecha];saveSession();var fs=Object.keys(DIAS).sort();curDay=fs[fs.length-1];renderTabs();render();updateHdrChips();showToast('Importado: '+Object.keys(data).length+' dias');}catch(err){showToast('Error al importar');}};reader.readAsText(f);evt.target.value='';}
-function deleteDay(fecha){if(!confirm('Eliminar el dia '+fecha+'?'))return;delete DIAS[fecha];saveSession();var fs=Object.keys(DIAS).sort();curDay=fs.length?fs[fs.length-1]:null;renderTabs();render();showToast('Dia '+fecha+' eliminado');}
+function deleteDay(fecha){if(!confirm('Eliminar el dia '+fecha+'?'))return;delete DIAS[fecha];saveSession();deleteFromSupabase(fecha);var fs=Object.keys(DIAS).sort();curDay=fs.length?fs[fs.length-1]:null;renderTabs();render();showToast('Dia '+fecha+' eliminado');}
 
 /* RANKING FLOTA FILTER */
 var rankFlota='all';
@@ -1919,6 +1922,99 @@ function exportSemanal(){
   var sem=fs.length>1?fs[0]+' al '+fs[fs.length-1]:fs[0];
   XLSX.writeFile(wb,'semanal_sem'+curSemana+'_'+sem.replace(/[/]/g,'-')+'.xlsx');
   showToast('Exportado');
+}
+
+/* ══════════════════════════════════════════
+   22c. SUPABASE SYNC
+══════════════════════════════════════════ */
+var SUPA_URL = 'https://boosebgyavjeoioppriu.supabase.co';
+var SUPA_KEY = 'sb_publishable_HiJaBpjGmKdyCCUCRt4jnA_7tvGbDXI';
+var isSyncing = false;
+
+function supaHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Prefer': 'resolution=merge-duplicates'
+  };
+}
+
+// Publish all DIAS to Supabase (coordinator only)
+function publishToSupabase() {
+  var fs = Object.keys(DIAS);
+  if(!fs.length){ showToast('Sin datos para publicar'); return; }
+  if(!confirm('Publicar ' + fs.length + ' dia(s) para que tu equipo los vea?')) return;
+
+  showToast('Publicando...');
+  var promises = fs.map(function(fecha) {
+    var row = {
+      fecha: fecha,
+      data: JSON.stringify(DIAS[fecha]),
+      updated_at: new Date().toISOString()
+    };
+    return fetch(SUPA_URL + '/rest/v1/flotaops_dias', {
+      method: 'POST',
+      headers: supaHeaders(),
+      body: JSON.stringify(row)
+    });
+  });
+
+  Promise.all(promises).then(function(responses) {
+    var ok = responses.filter(function(r){ return r.ok; }).length;
+    showToast('Publicado: ' + ok + ' dia(s)');
+    document.getElementById('syncStatus').textContent = 'Publicado hace un momento';
+  }).catch(function(err) {
+    showToast('Error al publicar');
+    console.error(err);
+  });
+}
+
+// Load DIAS from Supabase (all users)
+function loadFromSupabase() {
+  if(isSyncing) return;
+  isSyncing = true;
+  document.getElementById('syncStatus').textContent = 'Cargando...';
+
+  fetch(SUPA_URL + '/rest/v1/flotaops_dias?select=*&order=fecha.asc', {
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY
+    }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    if(!rows || !rows.length) {
+      document.getElementById('syncStatus').textContent = 'Sin datos en la nube';
+      isSyncing = false;
+      return;
+    }
+    // Merge cloud data into DIAS
+    rows.forEach(function(row) {
+      try {
+        DIAS[row.fecha] = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      } catch(e) {}
+    });
+    var fs = Object.keys(DIAS).sort();
+    curDay = fs[fs.length-1];
+    renderTabs(); render(); updateHdrChips();
+    var t = new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('syncStatus').textContent = 'Actualizado a las ' + t + ' (' + rows.length + ' dias)';
+    isSyncing = false;
+  })
+  .catch(function(err) {
+    document.getElementById('syncStatus').textContent = 'Error de conexion';
+    isSyncing = false;
+    console.error(err);
+  });
+}
+
+// Delete a day from Supabase
+function deleteFromSupabase(fecha) {
+  fetch(SUPA_URL + '/rest/v1/flotaops_dias?fecha=eq.' + encodeURIComponent(fecha), {
+    method: 'DELETE',
+    headers: supaHeaders()
+  });
 }
 
 /* ══════════════════════════════════════════
