@@ -886,13 +886,13 @@ tbody td.c{text-align:center;}tbody td.sp{border-left:2px solid var(--b2);}
       <div class="filter-group">
         <div class="filter-lbl">Flota</div>
         <div class="flota-tabs">
-          <button class="ftab fa" onclick="setFlota('all',this)"><span class="ftab-dot" style="background:var(--tx)"></span>Todos</button>
-          <button class="ftab" onclick="setFlota('LATAM',this)"><span class="ftab-dot" style="background:var(--lat)"></span>Latam</button>
-          <button class="ftab" onclick="setFlota('SKY',this)"><span class="ftab-dot" style="background:var(--sky)"></span>Sky</button>
-          <button class="ftab" onclick="setFlota('JETSMART',this)"><span class="ftab-dot" style="background:var(--jet)"></span>JetSmart</button>
-          <button class="ftab" onclick="setFlota('AEROPUERTO',this)"><span class="ftab-dot" style="background:var(--acc)"></span>Aeropuerto</button>
-          <button class="ftab" onclick="setFlota('URBANO',this)"><span class="ftab-dot" style="background:var(--pur)"></span>Urbano</button>
-          <button class="ftab" onclick="setFlota('PLAZAS',this)"><span class="ftab-dot" style="background:#b45309"></span>Plazas</button>
+          <button class="ftab fa" data-flota="all" onclick="setFlota('all',this)"><span class="ftab-dot" style="background:var(--tx)"></span>Todos</button>
+          <button class="ftab" data-flota="LATAM" onclick="setFlota('LATAM',this)"><span class="ftab-dot" style="background:var(--lat)"></span>Latam</button>
+          <button class="ftab" data-flota="SKY" onclick="setFlota('SKY',this)"><span class="ftab-dot" style="background:var(--sky)"></span>Sky</button>
+          <button class="ftab" data-flota="JETSMART" onclick="setFlota('JETSMART',this)"><span class="ftab-dot" style="background:var(--jet)"></span>JetSmart</button>
+          <button class="ftab" data-flota="AEROPUERTO" onclick="setFlota('AEROPUERTO',this)"><span class="ftab-dot" style="background:var(--acc)"></span>Aeropuerto</button>
+          <button class="ftab" data-flota="URBANO" onclick="setFlota('URBANO',this)"><span class="ftab-dot" style="background:var(--pur)"></span>Urbano</button>
+          <button class="ftab" data-flota="PLAZAS" onclick="setFlota('PLAZAS',this)"><span class="ftab-dot" style="background:#b45309"></span>Plazas</button>
         </div>
       </div>
       <div class="filter-group">
@@ -953,13 +953,13 @@ tbody td.c{text-align:center;}tbody td.sp{border-left:2px solid var(--b2);}
             <div class="sem-export-wrap" style="justify-content:space-between;align-items:center;">
               <div class="rk-flota-bar">
                 <span>Flota:</span>
-                <button class="rk-ftab active-all" onclick="setSemRkFlota('all',this)">Todos</button>
-                <button class="rk-ftab" onclick="setSemRkFlota('LATAM',this)">Latam</button>
-                <button class="rk-ftab" onclick="setSemRkFlota('SKY',this)">Sky</button>
-                <button class="rk-ftab" onclick="setSemRkFlota('JETSMART',this)">JetSmart</button>
-                <button class="rk-ftab" onclick="setSemRkFlota('AEROPUERTO',this)">Aeropuerto</button>
-                <button class="rk-ftab" onclick="setSemRkFlota('URBANO',this)">Urbano</button>
-                <button class="rk-ftab" onclick="setSemRkFlota('PLAZAS',this)">Plazas</button>
+                <button class="rk-ftab active-all" data-flota="all" onclick="setFlota('all',this)">Todos</button>
+                <button class="rk-ftab" data-flota="LATAM" onclick="setFlota('LATAM',this)">Latam</button>
+                <button class="rk-ftab" data-flota="SKY" onclick="setFlota('SKY',this)">Sky</button>
+                <button class="rk-ftab" data-flota="JETSMART" onclick="setFlota('JETSMART',this)">JetSmart</button>
+                <button class="rk-ftab" data-flota="AEROPUERTO" onclick="setFlota('AEROPUERTO',this)">Aeropuerto</button>
+                <button class="rk-ftab" data-flota="URBANO" onclick="setFlota('URBANO',this)">Urbano</button>
+                <button class="rk-ftab" data-flota="PLAZAS" onclick="setFlota('PLAZAS',this)">Plazas</button>
                 <span style="margin-left:8px">Orden:</span>
                 <div style="display:flex;gap:2px;background:var(--s3);border-radius:var(--rs);padding:2px;">
                   <button class="rp-sort-btn active" id="semRkAsc" onclick="setSemRkSort('asc',this)">Menor</button>
@@ -1321,7 +1321,8 @@ function loadConductores() {
   saveConductores();
 }
 function saveConductores() {
-  try { localStorage.setItem('flotaops_conductores', JSON.stringify(CONDUCTORES)); } catch(e) {}
+  try { localStorage.setItem('flotaops_conductores', JSON.stringify(CONDUCTORES)); }
+  catch(e) { console.error('No se pudo guardar CONDUCTORES localmente', e); showToast('Aviso: no se pudo guardar localmente (revisa espacio del navegador)'); }
 }
 function getCond(movil) { return CONDUCTORES[String(movil)] || null; }
 function isAerolineaFlota(f) { return !!FLOTAS_AERO[(f||'').toUpperCase()]; }
@@ -2283,6 +2284,7 @@ function setView(v,btn){
     if(v==='s'){
       renderSemTabs();
       buildMobileWeekSel();
+      syncFlotaBtns(curFlota);
       // Always show ranking sub-tab when switching to semanal
       document.getElementById('semViewRanking').style.display='block';
       document.getElementById('semViewDias').style.display='none';
@@ -2294,13 +2296,18 @@ function setView(v,btn){
     }
   }
 }
+function syncFlotaBtns(f){
+  document.querySelectorAll('.flota-tabs .ftab').forEach(function(b){
+    b.className='ftab'+(b.getAttribute('data-flota')===f?' '+(f==='all'?'fa':f==='LATAM'?'fl':f==='SKY'?'fs':f==='JETSMART'?'fj':'fp'):'');
+  });
+  document.querySelectorAll('.rk-flota-bar .rk-ftab').forEach(function(b){
+    var cls=f==='all'?'active-all':f==='LATAM'?'active-lat':f==='SKY'?'active-sky':f==='JETSMART'?'active-jet':'active-all';
+    b.className='rk-ftab'+(b.getAttribute('data-flota')===f?' '+cls:'');
+  });
+}
 function setFlota(f,btn){
   curFlota=f;
-  document.querySelectorAll('.flota-tabs .ftab').forEach(function(b){
-    b.className='ftab';
-  });
-  var cls=f==='all'?'fa':f==='LATAM'?'fl':f==='SKY'?'fs':f==='JETSMART'?'fj':'fp';
-  btn.classList.add(cls);
+  syncFlotaBtns(f);
   render();
 }
 function setFil(f,btn){
@@ -2913,11 +2920,42 @@ function supaHeaders() {
   };
 }
 
+// Publish CONDUCTORES roster to Supabase (shared across devices)
+function publishConductoresToSupabase() {
+  var row = { id: 'roster', data: JSON.stringify(CONDUCTORES), updated_at: new Date().toISOString() };
+  return fetch(SUPA_URL + '/rest/v1/flotaops_conductores?id=eq.roster', {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  }).then(function() {
+    return fetch(SUPA_URL + '/rest/v1/flotaops_conductores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY },
+      body: JSON.stringify(row)
+    });
+  });
+}
+// Load CONDUCTORES roster from Supabase (shared across devices)
+function loadConductoresFromSupabase() {
+  return fetch(SUPA_URL + '/rest/v1/flotaops_conductores?id=eq.roster&select=*', {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    if(rows && rows.length && rows[0].data) {
+      try {
+        var cloud = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+        if(cloud && typeof cloud === 'object') { CONDUCTORES = cloud; saveConductores(); }
+      } catch(e) { console.error('Error al parsear roster de la nube', e); }
+    }
+  })
+  .catch(function(err){ console.error('Error al cargar roster de conductores', err); });
+}
+
 // Publish all DIAS to Supabase (coordinator only)
 function publishToSupabase() {
   var fs = Object.keys(DIAS);
   if(!fs.length){ showToast('Sin datos para publicar'); return; }
-  if(!confirm('Publicar ' + fs.length + ' dia(s) para que tu equipo los vea?')) return;
+  if(!confirm('Publicar ' + fs.length + ' dia(s) y el roster de conductores para que tu equipo los vea?')) return;
 
   showToast('Publicando...');
   var promises = fs.map(function(fecha) {
@@ -2945,9 +2983,10 @@ function publishToSupabase() {
       });
     });
   });
+  promises.push(publishConductoresToSupabase());
 
   Promise.all(promises).then(function(responses) {
-    showToast('Publicado: ' + fs.length + ' dia(s)');
+    showToast('Publicado: ' + fs.length + ' dia(s) + roster');
     document.getElementById('syncStatus').textContent = 'Publicado hace un momento';
   }).catch(function(err) {
     showToast('Error al publicar');
@@ -2955,7 +2994,7 @@ function publishToSupabase() {
   });
 }
 
-// Load DIAS from Supabase (all users)
+// Load DIAS + CONDUCTORES from Supabase (all users)
 function loadFromSupabase() {
   if(isSyncing) return;
   isSyncing = true;
@@ -2963,17 +3002,18 @@ function loadFromSupabase() {
   isSyncingTimer = setTimeout(function(){ isSyncing=false; }, 15000); // reset after 15s
   var ss=document.getElementById('syncStatus'); if(ss){ss.style.display='inline';ss.textContent='Cargando...';}
 
-  fetch(SUPA_URL + '/rest/v1/flotaops_dias?select=*&order=fecha.asc', {
-    headers: {
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer ' + SUPA_KEY
-    }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(rows) {
+  Promise.all([
+    fetch(SUPA_URL + '/rest/v1/flotaops_dias?select=*&order=fecha.asc', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+    }).then(function(r){ return r.json(); }),
+    loadConductoresFromSupabase()
+  ])
+  .then(function(results) {
+    var rows = results[0];
     if(!rows || !rows.length) {
       var ss3=document.getElementById('syncStatus'); if(ss3){ss3.style.display='inline';ss3.textContent='Sin datos en la nube';}
       isSyncing = false;
+      renderTabs(); render();
       return;
     }
     // Merge cloud data into DIAS
@@ -3181,7 +3221,6 @@ function doExportDetail() {
 
 /* SEMANAL SUB-TABS */
 var semSubTab = 'ranking';
-var semRkFlota = 'all';
 var semFilNuevo = false;
 function toggleSemNuevo(btn){
   semFilNuevo = !semFilNuevo;
@@ -3200,14 +3239,7 @@ function setSemSubTab(tab, btn) {
   if(tab==='ranking') renderSemRanking();
   else { renderSemTabs(); renderSemanal(); }
 }
-
-function setSemRkFlota(flota, btn) {
-  semRkFlota = flota;
-  document.querySelectorAll('.rk-flota-bar .rk-ftab').forEach(function(b){ b.className='rk-ftab'; });
-  var cls = flota==='all'?'active-all':flota==='LATAM'?'active-lat':flota==='SKY'?'active-sky':flota==='JETSMART'?'active-jet':'active-all';
-  btn.classList.add(cls);
-  renderSemRanking();
-}
+/* Flota filter for Semanal Ranking is unified with the main toolbar (curFlota) via setFlota() */
 
 function setSemRkSort(dir, btn) {
   semRkSort = dir;
@@ -3236,7 +3268,7 @@ function renderSemRanking() {
       var q = ((document.getElementById('srchInput')||{}).value||'').toLowerCase();
       if(q && c.movil.indexOf(q)<0 && (c.placa||'').toLowerCase().indexOf(q)<0) return;
       // Apply flota filter using shouldShow
-      if(!shouldShow(c, semRkFlota)) return;
+      if(!shouldShow(c, curFlota)) return;
       // Apply Nuevos filter
       if(semFilNuevo && !isNuevoCond(c.movil)) return;
 
@@ -3310,7 +3342,7 @@ function exportSemRanking() {
     if(!DIAS[f]) return;
     DIAS[f].conductores.forEach(function(c){
       var flota=(c.flota||'').toUpperCase();
-      if(!shouldShow(c, semRkFlota)) return;
+      if(!shouldShow(c, curFlota)) return;
       if(!condMap[c.movil]) condMap[c.movil]={movil:c.movil,placa:c.placa,flota:c.flota,tipoVehiculo:c.tipoVehiculo||'',monto:0,totalServicios:0,horas:0,dias:0};
       var cm=condMap[c.movil];
       cm.monto+=parseFloat(c.monto)||0;
@@ -3701,6 +3733,8 @@ function syncConductoresToDias() {
 ══════════════════════════════════════════ */
 loadConductores();
 loadProduccion();
+// Silent background sync: self-heal roster from cloud in case local storage was cleared/lost
+loadConductoresFromSupabase().then(function(){ renderTabs(); render(); if(curView==='s') renderSemanal(); });
 
 
 
